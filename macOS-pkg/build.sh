@@ -145,29 +145,40 @@ function buildProduct() {
 }
 
 function signProduct() {
+    local name=$1
+    local developer_identiy=$2
     log_info "Application installer signing process started.(3/3)"
     mkdir -pv "${TARGET_DIRECTORY}/pkg-signed"
     chmod -R 755 "${TARGET_DIRECTORY}/pkg-signed"
 
-    read -p "Please enter the Apple Developer Installer Certificate ID:" APPLE_DEVELOPER_CERTIFICATE_ID
-    productsign --sign "Developer ID Installer: ${APPLE_DEVELOPER_CERTIFICATE_ID}" \
-    "${TARGET_DIRECTORY}/pkg/$1" \
-    "${TARGET_DIRECTORY}/pkg-signed/$1"
+    if [ -z "$developer_identiy" ]; then
+        read -p "Please enter the Apple Developer Installer Certificate ID:" developer_identiy
+    fi
 
-    pkgutil --check-signature "${TARGET_DIRECTORY}/pkg-signed/$1"
+    # "Developer ID Application: Shan Yu (4TDFARXPF6)"
+    productsign --sign "${developer_identiy}" \
+    "${TARGET_DIRECTORY}/pkg/$name" \
+    "${TARGET_DIRECTORY}/pkg-signed/$name" || {
+        echo "productsign failed"
+        exit 1
+    }
+
+    pkgutil --check-signature "${TARGET_DIRECTORY}/pkg-signed/$name"
 }
 
 function createInstaller() {
     log_info "Application installer generation process started.(3 Steps)"
     buildPackage
     buildProduct ${PRODUCT}-macos-installer-x64-${VERSION}.pkg
-    while true; do
-        read -p "Do you wish to sign the installer (You should have Apple Developer Certificate) [y/N]?" answer
-        [[ $answer == "y" || $answer == "Y" ]] && FLAG=true && break
-        [[ $answer == "n" || $answer == "N" || $answer == "" ]] && log_info "Skipped signing process." && FLAG=false && break
-        echo "Please answer with 'y' or 'n'"
-    done
-    [[ $FLAG == "true" ]] && signProduct ${PRODUCT}-macos-installer-x64-${VERSION}.pkg
+    if [ -z "$SIGN_YES" ]; then
+        while true; do
+            read -p "Do you wish to sign the installer (You should have Apple Developer Certificate) [y/N]?" answer
+            [[ $answer == "y" || $answer == "Y" ]] && FLAG=true && break
+            [[ $answer == "n" || $answer == "N" || $answer == "" ]] && log_info "Skipped signing process." && FLAG=false && break
+            echo "Please answer with 'y' or 'n'"
+        done
+    fi
+    [[ $FLAG == "true" || "$SIGN_YES" == "true" ]] && signProduct ${PRODUCT}-macos-installer-x64-${VERSION}.pkg "$SIGN_IDENTITY"
     log_info "Application installer generation steps finished."
 }
 
@@ -177,15 +188,16 @@ function createUninstaller(){
     sed -i '' -e "s/__PRODUCT__/${PRODUCT}/g" "${TARGET_DIRECTORY}/darwinpkg/Library/${PRODUCT}/${VERSION}/uninstall.sh"
 }
 
+function notarizationPkg() {
+    echo "notarization macOS app..."
+    local name=${TARGET_DIRECTORY}/pkg-signed/${PRODUCT}-macos-installer-x64-${VERSION}.pkg
+    xcrun notarytool submit $name --keychain-profile "NotarizationItemName" --wait
+    # xcrun notarytool info c440cb54-12e7-4745-838e-66a26282c69d  --keychain-profile "NotarizationItemName"
+    # xcrun notarytool log 4e2cd70c-5388-4741-98f2-80c166eac10f --keychain-profile "NotarizationItemName" developer_log.json
+    echo "$name"
+}
+
 #Pre-requisites
-command -v mvn -v >/dev/null 2>&1 || {
-    log_warn "Apache Maven was not found. Please install Maven first."
-    # exit 1
-}
-command -v ballerina >/dev/null 2>&1 || {
-    log_warn "Ballerina was not found. Please install ballerina first."
-    # exit 1
-}
 
 #Main script
 log_info "Installer generating process started."
@@ -194,6 +206,6 @@ copyDarwinDirectory
 copyBuildDirectory
 createUninstaller
 createInstaller
+notarizationPkg
 
-log_info "Installer generating process finished"
 exit 0
