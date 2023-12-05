@@ -7,6 +7,7 @@ SCRIPTPATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 TARGET_DIRECTORY="$SCRIPTPATH/../target"
 PRODUCT=${1}
 VERSION=${2}
+GROUP=${3}
 DATE=`date +%Y-%m-%d`
 TIME=`date +%H:%M:%S`
 LOG_PREFIX="[$DATE $TIME]"
@@ -98,11 +99,13 @@ copyDarwinDirectory(){
   chmod -R 755 "${TARGET_DIRECTORY}/darwin/scripts"
   chmod -R 755 "${TARGET_DIRECTORY}/darwin/Resources"
   chmod 755 "${TARGET_DIRECTORY}/darwin/Distribution"
+
 }
 
 copyBuildDirectory() {
     sed -i '' -e 's/__VERSION__/'${VERSION}'/g' "${TARGET_DIRECTORY}/darwin/scripts/postinstall"
     sed -i '' -e 's/__PRODUCT__/'${PRODUCT}'/g' "${TARGET_DIRECTORY}/darwin/scripts/postinstall"
+    sed -i '' -e 's/__GROUP__/'${GROUP}'/g' "${TARGET_DIRECTORY}/darwin/scripts/postinstall"
     chmod -R 755 "${TARGET_DIRECTORY}/darwin/scripts/postinstall"
 
     sed -i '' -e 's/__VERSION__/'${VERSION}'/g' "${TARGET_DIRECTORY}/darwin/Distribution"
@@ -116,6 +119,10 @@ copyBuildDirectory() {
     #Copy cellery product to /Library/Cellery
     mkdir -p "${TARGET_DIRECTORY}"/darwinpkg/Library/${PRODUCT}/${VERSION}
     cp -a "$SCRIPTPATH"/application/. "${TARGET_DIRECTORY}"/darwinpkg/Library/${PRODUCT}/${VERSION}
+    app_plist="$SCRIPTPATH"/darwin/Resources/${GROUP}.${PRODUCT}.plist
+    if [ -f "${app_plist}" ]; then
+      cp -f "${app_plist}" "${TARGET_DIRECTORY}"/darwinpkg/Library/${PRODUCT}/${VERSION}/
+    fi
     chmod -R 755 "${TARGET_DIRECTORY}"/darwinpkg/Library/${PRODUCT}/${VERSION}
 
     rm -rf "${TARGET_DIRECTORY}/package"
