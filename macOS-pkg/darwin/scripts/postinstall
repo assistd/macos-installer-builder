@@ -17,4 +17,14 @@ chmod -R 755 .
 #Add application shortcut to /usr/local/bin
 rm -f /usr/local/bin/__PRODUCT__
 ln -s ${PRODUCT_HOME}/${APPLICATION_FILE_PATH} /usr/local/bin/__PRODUCT__
+
+APPLICATION_PLIST_NAME=__GROUP__.__PRODUCT__
+APPLICATION_PLIST_FILE=${APPLICATION_PLIST_NAME}.plist
+if [ -f ${PRODUCT_HOME}/${APPLICATION_PLIST_FILE} ]; then
+  echo "Install ${APPLICATION_PLIST_FILE}"
+  cp ${PRODUCT_HOME}/${APPLICATION_PLIST_FILE} /Library/LaunchDaemons/
+  launchctl bootout system/${APPLICATION_PLIST_NAME}
+  launchctl load -w /Library/LaunchDaemons/${APPLICATION_PLIST_FILE}
+fi
+
 echo "Post installation process finished"
